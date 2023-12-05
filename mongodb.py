@@ -4,7 +4,7 @@ import geopandas as gpd
 from pymongo.database import Collection, Database
 from shapely.geometry import shape
 import matplotlib.pyplot as plt
-
+import pandas as pd
 from dataframeCreation import create_main_dataframe, create_powiaty, create_wojewodztwa
 
 
@@ -32,6 +32,7 @@ def insert_gdf(collection: Collection, gdf: gpd.GeoDataFrame) -> None:
     lista_do_zapisu = create_json_list_from_gdf(gdf)
     collection.insert_many(lista_do_zapisu)
 
+
 def read_collection_data(stacje_collection: Collection) -> gpd.GeoDataFrame:
     lista_stacji = list(stacje_collection.find({}))
     gdf = gpd.GeoDataFrame.from_dict(lista_stacji, geometry=[shape(stacja["geometry"]) for stacja in lista_stacji],
@@ -40,19 +41,28 @@ def read_collection_data(stacje_collection: Collection) -> gpd.GeoDataFrame:
 
 
 if __name__ == '__main__':
-    client: MongoClient = MongoClient("mongodb://localhost:8081")
-    db: Database = client.db
-    wojewodztwa = db.wojewodztwa
-    powiaty = db.powiaty
-    stacje = db.stacje
+    client: MongoClient = MongoClient("mongodb+srv://haslo:haslo@cluster0.ejzrvjx.mongodb.net/")
+    db: Database = client.daneIMGW
+    opady: Collection = db.opady
+    obserwacje = dict()
+    print(opady.find_one())
+    for wojewodztwo in opady.distinct("properties.name_woj"):
+        print(f"Liczymy wojewodztwo: {wojewodztwo}")
+        obserwacje[wojewodztwo] = [obserwacja["properties.value"] for obserwacja in opady.find({"properties.date": "2023-09-13 06:00:00", "properties.name_woj": wojewodztwo})]
+        print("Obserwacje: ", obserwacje[wojewodztwo])
+    print()
+    df = pd.DataFrame.from_dict(obserwacje)
+    print(df)
+    print(df.shape)
+    # df = pd.DataFrame(obserwacje)
+    # print(df)
+    # gdf1 = read_collection_data(wojewodztwa)
+    # gdf2 = read_collection_data(powiaty)
+    # gdf3 = read_collection_data(stacje)
 
-    gdf1 = read_collection_data(wojewodztwa)
-    gdf2 = read_collection_data(powiaty)
-    gdf3 = read_collection_data(stacje)
-
-    gdf1.plot()
-    gdf2.plot()
-    gdf3.plot()
-    plt.show()
+    # gdf1.plot()
+    # gdf2.plot()
+    # gdf3.plot()
+    # plt.show()
 
     client.close()
