@@ -2,8 +2,9 @@
 # 'ifcid', 'type', 'date', 'value', 'geometry', 'index_woj', 'name_woj', 'index_pow', 'name_pow'
 
 import redis
-
+import statistics
 from dataframeCreation import create_main_dataframe
+
 
 def create_redis_db(connection):
     stacje = create_main_dataframe()
@@ -28,6 +29,18 @@ def create_redis_db(connection):
 r = redis.Redis(host='localhost', port=8081, decode_responses=True)
 
 # create_redis_db(r)
-a = r.keys("*:*:krosno:*:*")
-print(a)
+
+# a = r.keys("*")
+# for key in a:
+#     id, wojewodztwo, powiat, x, y = key.split(":")
+#     print(wojewodztwo)
+
+nazwa_wojewodztwa = "warmińsko-mazurskie"
+wojewodztwo_keys = r.keys(f"*:{nazwa_wojewodztwa}:*:*:*")
+wartosci = []
+for key in wojewodztwo_keys:
+    wartosci += [float(x) for x in list(r.hgetall(key).values())]
+
+output = statistics.mean(wartosci)
+print(f"Średni opad przez cały wrzesień w województwie {nazwa_wojewodztwa[:-1]}m wyniósł: {output}")
 r.close()
