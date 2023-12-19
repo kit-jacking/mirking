@@ -4,8 +4,7 @@ import pandas as pd
 import pymongo
 import sys
 import json
-from urllib import request
-from zipfile import ZipFile
+
 
 
 # *** CONNECT TO MONGO DB
@@ -27,17 +26,6 @@ powiaty = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\p
 woj = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\woj.shp").to_crs(epsg=2180)
 effacility = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\effacility.geojson").set_crs('epsg:2180', allow_override=True) 
 
-
-
-# *** IMGW DATA DOWNLOAD
-# Download data from IMGW site -                     UNCOMMENT IF NEED TO REDOWNLOAD DATA
-year = 2023
-month = 10
-# url = f'https://dane.imgw.pl/datastore/getfiledown/Arch/Telemetria/Meteo/{year}/Meteo_{year}-{month}.zip'
-# file_name = f"Dane-IMGW-{year}-{month}.zip"
-# request.urlretrieve(url, file_name)
-# with ZipFile(file_name, 'r') as f:
-#     f.extractall(rf"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW\{year}-{month}")
 
 
 
