@@ -5,6 +5,11 @@ import redis
 import statistics
 from dataframeCreation import create_main_dataframe
 
+def connect_to_db(host: str, port: str, password: str):
+    pool = redis.ConnectionPool(host = host, port = port, password = password)
+    db = redis.Redis(connection_pool=pool)
+    return db
+
 
 def create_redis_db(connection):
     stacje = create_main_dataframe()
