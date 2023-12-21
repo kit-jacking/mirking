@@ -25,6 +25,19 @@ def create_redis_db(connection):
 
         print(f"Przerobiło: {klucz}")
 
+def srednie_opady(connection) -> None:
+    lista_nazw_wojewodztw =["dolnośląskie", "kujawsko-pomorskie", "lubelskie", "lubuskie", "łódzkie", "małopolskie", "mazowieckie",
+                            "opolskie", "podkarpackie", "podlaskie", "pomorskie", "śląskie", "świętokrzyskie", "warmińsko-mazurskie", "wielkopolskie", "zachodniopomorskie"]
+
+    for i, nazwa_wojewodztwa in enumerate(lista_nazw_wojewodztw):
+        wojewodztwo_keys = connection.keys(f"*:{nazwa_wojewodztwa}:*:*:*")
+
+        wartosci = []
+        for key in wojewodztwo_keys:
+            wartosci += [float(x) for x in list(connection.hgetall(key).values())]
+
+        output = statistics.mean(wartosci)
+        print(f"{i}. Średni opad przez cały wrzesień w województwie {nazwa_wojewodztwa[:-1]}m wyniósł: {output} mm")
 
 r = redis.Redis(host='localhost', port=8081, decode_responses=True)
 
@@ -35,12 +48,6 @@ r = redis.Redis(host='localhost', port=8081, decode_responses=True)
 #     id, wojewodztwo, powiat, x, y = key.split(":")
 #     print(wojewodztwo)
 
-nazwa_wojewodztwa = "warmińsko-mazurskie"
-wojewodztwo_keys = r.keys(f"*:{nazwa_wojewodztwa}:*:*:*")
-wartosci = []
-for key in wojewodztwo_keys:
-    wartosci += [float(x) for x in list(r.hgetall(key).values())]
+srednie_opady(r)
 
-output = statistics.mean(wartosci)
-print(f"Średni opad przez cały wrzesień w województwie {nazwa_wojewodztwa[:-1]}m wyniósł: {output}")
 r.close()
