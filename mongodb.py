@@ -81,22 +81,23 @@ def insert_sorted_data(client: MongoClient = None, main_gdf: gpd.GeoDataFrame = 
     
     db_pow.insert_many(list_pow)
     
-    # # Insert stacje to db
-    # print("Inserting effacilities...")
-    # for i in eff_gdf.index:
-    #     eff = str(eff_gdf["ifcid"][i])
-    #     name = eff_gdf['name1'][i]
-    #     try:
-    #         geom = json.loads(to_geojson(eff_gdf["geometry"][i]))
-    #         mean = opady_eff.loc[xs[eff,:], :].reset_index([0])["mean"].to_dict()
-    #         median = opady_eff.loc[xs[eff,:], :].reset_index([0])["median"].to_dict()
-    #         json_dict = {"ifcid": eff, "name": name, "mean": mean, "median": median, "geometry": geom}
-    #         list_eff.append(json_dict)
-    #     except:
-    #         print("??? Nie ma stacji: ", eff)
-    #         continue
+    # Insert stacje to db
+    print("Inserting effacilities...")
+    for i in eff_gdf.index:
+        eff = eff_gdf["ifcid"][i]
+        name = eff_gdf['name1'][i]
+        try:
+            geom = json.loads(to_geojson(eff_gdf["geometry"][i]))
+            mean = opady_eff.loc[xs[eff,:], :].reset_index([0])["mean"].to_dict()
+            median = opady_eff.loc[xs[eff,:], :].reset_index([0])["median"].to_dict()
+            eff = str(eff)
+            json_dict = {"ifcid": eff, "name": name, "mean": mean, "median": median, "geometry": geom}
+            list_eff.append(json_dict)
+        except:
+            print("Nie ma stacji: ", eff)
+            continue
     
-    # db_eff.insert_many(list_eff)
+    db_eff.insert_many(list_eff)
     
     
 
