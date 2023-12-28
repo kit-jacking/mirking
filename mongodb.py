@@ -3,9 +3,10 @@ from pymongo import MongoClient
 import geopandas as gpd
 from pymongo.database import Collection, Database
 from shapely.geometry import shape
+from shapely import to_geojson
 import matplotlib.pyplot as plt
 import pandas as pd
-from dataframeCreation import create_main_dataframe, create_powiaty, create_wojewodztwa
+from dataframeCreation import create_dataframes, create_main_dataframe, create_powiaty, create_wojewodztwa
 
 
 def create_json_list_from_gdf(gdf: gpd.GeoDataFrame) -> list[dict]:
@@ -27,33 +28,78 @@ def insert_stacje_data(stacje_collection: Collection) -> None:
     print(lista_do_zapisu)
     stacje_collection.insert_many(lista_do_zapisu)
     
-def insert_sorted_data(client: MongoClient = None, gdf: gpd.GeoDataFrame = None) -> None:
-    # Inserts data to several databases 
-    # db_woj = client['wojewodztwa']
-    # db_powiat = client['powiaty']
-    # db_stacja = client['stacje']
+# def create_woj_data(woj_gdf: gpd.GeoDataFrame ,stat_gdf: gpd.GeoDataFrame):
+#     woj_gdf = woj_gdf[['name', 'geometry']]
     
+def insert_sorted_data(client: MongoClient = None, main_gdf: gpd.GeoDataFrame = None, eff_gdf: gpd.GeoDataFrame = None, pow_gdf: gpd.GeoDataFrame = None, woj_gdf: gpd.GeoDataFrame = None ) -> None:
+    # Inserts data to several databases 
+    db_woj = client.grouped_data.wojewodztwa
+    db_pow = client.grouped_data.powiaty
+    db_eff = client.grouped_data.stacje
     
     # db_dzien = client['dni']
     # db_noc = client['noce']
     # db_doba = client['doby']
     
-    if gdf == None:
-        gdf = create_main_dataframe()
-        gdf["date"] = gdf["date"].astype(str)
+    # Create list of jsons to add to each db
+    list_woj = []
+    list_pow = []
+    list_eff = []
+    
+    if main_gdf == None:
+        main_gdf, eff_gdf, pow_gdf, woj_gdf = create_main_dataframe()
+        main_gdf["date"] = main_gdf["date"].astype(str)
         
-    group_woj = gdf.groupby("name_woj")
-    group_powiat = gdf.groupby('name_pow')
-    group_station = gdf.groupby('ifcid')
-    
-    # For date-time > maybe divide it to 2 attributes? Date and hour independently
-    
-    
-    print(grouped.groups.keys()) # Get all keys. For it to be iterable, convert to list()
-    
-    
-    
+    opady_woj, opady_pow, opady_eff = create_dataframes(main_gdf)
+    xs = pd.IndexSlice
 
+    # Insert wojewodztwa to db
+    print("Inserting voivodeships...")
+    for i in woj_gdf.index:
+        woj = woj_gdf["name"][i]
+        geom = json.loads(to_geojson(woj_gdf["geometry"][i]))
+        mean = opady_woj.loc[xs[woj,:], :].reset_index([0])["mean"].to_dict()
+        median = opady_woj.loc[xs[woj,:], :].reset_index([0])["median"].to_dict()
+        json_dict = {"name": woj, "mean": mean, "median": median, "geometry": geom}
+        list_woj.append(json_dict)
+    
+    db_woj.insert_many(list_woj)
+    
+    # Insert powiaty to db
+    print("Inserting powiaty...")
+    for i in pow_gdf.index:
+        pow = pow_gdf["name"][i]
+        geom = json.loads(to_geojson(pow_gdf["geometry"][i]))
+        try:
+            mean = opady_pow.loc[xs[pow,:], :].reset_index([0])["mean"].to_dict()
+            median = opady_pow.loc[xs[pow,:], :].reset_index([0])["median"].to_dict()
+            json_dict = {"name": pow, "mean": mean, "median": median, "geometry": geom}
+            list_pow.append(json_dict)
+        except:
+            print("Powiat bez stacji")
+            continue
+    
+    db_pow.insert_many(list_pow)
+    
+    # Insert stacje to db
+    print("Inserting effacilities...")
+    for i in eff_gdf.index:
+        eff = eff_gdf["ifcid"][i]
+        name = eff_gdf['name1'][i]
+        try:
+            geom = json.loads(to_geojson(eff_gdf["geometry"][i]))
+            mean = opady_eff.loc[xs[eff,:], :].reset_index([0])["mean"].to_dict()
+            median = opady_eff.loc[xs[eff,:], :].reset_index([0])["median"].to_dict()
+            eff = str(eff)
+            json_dict = {"ifcid": eff, "name": name, "mean": mean, "median": median, "geometry": geom}
+            list_eff.append(json_dict)
+        except:
+            print("Nie ma stacji: ", eff)
+            continue
+    
+    db_eff.insert_many(list_eff)
+    
+    
 
 def insert_gdf(collection: Collection, gdf: gpd.GeoDataFrame) -> None:
     lista_do_zapisu = create_json_list_from_gdf(gdf)
@@ -81,11 +127,11 @@ if __name__ == '__main__':
     #     obserwacje[wojewodztwo] = [obserwacja["properties.value"] for obserwacja in opady.find({"properties.date": "2023-09-13 06:00:00", "properties.name_woj": wojewodztwo})]
     #     print("Obserwacje: ", obserwacje[wojewodztwo])
     # print()
-    df = pd.DataFrame.from_dict(obserwacje)
-    print(df)
-    print(df.shape)
+    # df = pd.DataFrame.from_dict(obserwacje)
+    # print(df)
+    # print(df.shape)
     
-    insert_sorted_data()
+    insert_sorted_data(client)
     
     # insert_stacje_data(client["test"]["coll"])
     # df = pd.DataFrame(obserwacje)
