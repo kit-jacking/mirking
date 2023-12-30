@@ -3,22 +3,40 @@ from datetime import datetime
 import geopandas as gpd
 import matplotlib.pyplot as plt
 import pandas as pd
+import scipy
 from shapely import to_geojson
 
 
-def create_main_dataframe() -> gpd.GeoDataFrame:
+def create_main_dataframes() -> gpd.GeoDataFrame:
     powiaty = create_powiaty()
     woj = create_wojewodztwa()
     effacility = create_effacility()
 
-    opady_dzienne = pd.read_csv(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW\2023-10\B00604S_2023_10.csv",
+    raw_data_days = pd.read_csv(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW\2023-10\B00604S_2023_10.csv",
+                                header=None,
+                                delimiter=";").rename(columns={0: "ifcid", 1: "type", 2: "date", 3: "value"})
+    raw_data_minutes = pd.read_csv(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW\2023-10\B00608S_2023_10.csv",
                                 header=None,
                                 delimiter=";").rename(columns={0: "ifcid", 1: "type", 2: "date", 3: "value"})
     
-    opady_dzienne['value'] = opady_dzienne['value'].str.replace(',', '.').astype(float)
-    opady_dzienne["date"] = pd.to_datetime(opady_dzienne["date"])
+    raw_data_days['value'] = raw_data_days['value'].str.replace(',', '.').astype(float)
+    raw_data_days["date"] = pd.to_datetime(raw_data_days["date"])
+    
+    # Przygotowanie do analizy stat
+    raw_data_minutes['value'] = raw_data_minutes['value'].str.replace(',', '.').astype(float)
+    raw_data_minutes["date"] = pd.to_datetime(raw_data_minutes["date"])
+    raw_data_minutes = raw_data_minutes.drop(columns=[4])
+    
+    def is_day_filter(hr):
+        if hr >= 6 and hr < 22:
+            return True
+        else:
+            return False
+        
+    raw_data_minutes['is_day'] = raw_data_minutes.date.dt.hour.map(is_day_filter)
 
-    stacje_zlaczone = opady_dzienne.merge(effacility[["ifcid", "geometry", "name1"]], how="left", on="ifcid")
+    # Przygotowanie do analizy geostat
+    stacje_zlaczone = raw_data_days.merge(effacility[["ifcid", "geometry", "name1"]], how="left", on="ifcid")
     stacje_zlaczone = gpd.GeoDataFrame(stacje_zlaczone, geometry=stacje_zlaczone["geometry"]).to_crs(epsg=2180)
     
     stacje_zlaczone = gpd.tools.sjoin(stacje_zlaczone, woj[["geometry", "name"]], how="left", rsuffix="woj")
@@ -26,7 +44,8 @@ def create_main_dataframe() -> gpd.GeoDataFrame:
         columns={"name_left": "name_woj", 'name1':"name_eff"})
     stacje_zlaczone = stacje_zlaczone.drop(columns=[4])
     stacje_zlaczone = stacje_zlaczone.dropna()
-    return stacje_zlaczone, effacility, powiaty, woj
+    
+    return raw_data_days, raw_data_minutes, stacje_zlaczone, effacility, powiaty, woj
 
 def create_effacility() -> gpd.GeoDataFrame:
     eff = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\effacility.geojson")
@@ -36,71 +55,72 @@ def create_effacility() -> gpd.GeoDataFrame:
 def create_wojewodztwa() -> gpd.GeoDataFrame:
     woj = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\woj.shp").to_crs(epsg=2180)
     woj = woj[['name', 'geometry']]
-    # woj['geom_woj'] = woj.geometry
     return woj
 
 
 def create_powiaty() -> gpd.GeoDataFrame:
     powiaty = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\powiaty.shp").to_crs(epsg=2180)
     powiaty = powiaty[['name', 'geometry']]
-    # powiaty['geom_pow'] = powiaty.geometry
     return powiaty
 
+# *** ANALIZA STATYSTYCZNA
 
-def create_dataframes(main_geodataframe: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
-    # Srednia i mediana wartości pomiaru w podziale na daty w poszczegolnych wojewodztwach, powiatach i jednostkach:
+def create_dataframes(main_dataframe: pd.DataFrame):
+    opady_daytime = main_dataframe.loc[main_dataframe['is_day'] == True].groupby(pd.Grouper(key='date', freq='D'))['value'].aggregate(["mean", "median"])
+    opady_nighttime = main_dataframe.loc[main_dataframe['is_day'] == False].groupby(pd.Grouper(key='date', freq='D'))['value'].aggregate(["mean", "median"])
+    opady_day = main_dataframe.groupby(pd.Grouper(key='date', freq='D'))['value'].aggregate(["mean", "median"])
+    # add maybe also group by effacility?
+    
+    # Średnia odcięta kod, który nie działa z aggregate: scipy.stats.trim_mean(main_dataframe.loc[main_dataframe['is_day'] == True].value, 0.1)
+    return opady_daytime, opady_nighttime, opady_day 
 
+
+# *** ANALIZA GEOSTATYSTYCZNA
+
+def create_geodataframes(main_geodataframe: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
+    
+    # Srednia i mediana wartości pomiaru w podziale na daty w poszczegolnych wojewodztwach i powiatach:
     opady_woj = main_geodataframe.groupby(["name_woj", "date"])["value"].aggregate(["mean", "median"])
     opady_pow = main_geodataframe.groupby(["name_pow", "date"])["value"].aggregate(["mean", "median"])
-    opady_eff = main_geodataframe.groupby(["ifcid", "date"])["value"].aggregate(["mean", "median"])
 
-    # # Zmiany wartosci sredniej i mediany w zadanych interwalach czasu w wojewodztwach i powiatach.
-    # date_format = "%Y-%m-%d %H:%M"
-    # start = datetime.strptime("2023-09-01 06:00", date_format)
-    # end = datetime.strptime("2023-09-04 06:00", date_format)
+    return opady_woj, opady_pow
 
-    # opady_woj_daty = \
-    #     stacje_zlaczone.loc[(stacje_zlaczone["date"] >= start) & (stacje_zlaczone["date"] < end)].groupby(
-    #         ["name_woj", "date"])[
-    #         "value"].aggregate(["mean", "median"])
-    # opady_pow_daty = \
-    #     stacje_zlaczone.loc[(stacje_zlaczone["date"] >= start) & (stacje_zlaczone["date"] < end)].groupby(
-    #         ["name_pow", "date"])[
-    #         "value"].aggregate(["mean", "median"])
-
-    return opady_woj, opady_pow, opady_eff
-                                          #, opady_woj_daty, opady_pow_daty
-
-
+def calculate_stat_change(gdf: gpd.GeoDataFrame, gov_unit_name: str, date_start: datetime, date_end: datetime):
+    """
+    Args:
+        gdf (gpd.GeoDataFrame): result of create_geodataframes function GeoDataFrame containing gov_unit of interest
+        date_start (datetime): Format: "yyyy-mm-dd HH:MM" - has to match date and time in gdf index
+        date_end (datetime): Format: "yyyy-mm-dd HH:MM" 
+    """
+    date_format = "%Y-%m-%d %H:%M"
+    time_start = datetime.strptime(date_start, date_format)
+    time_end = datetime.strptime(date_end, date_format)
+    
+    xs = pd.IndexSlice
+    try:
+        mean_end = gdf.loc[xs[gov_unit_name, time_end], "mean"]
+        mean_start = gdf.loc[xs[gov_unit_name, time_start], "mean"]
+        
+        median_end = gdf.loc[xs[gov_unit_name, time_end], "median"]
+        median_start = gdf.loc[xs[gov_unit_name, time_start], "median"]
+        
+        print(f"***\nJednostka: {gov_unit_name}\nDaty: {date_start}, {date_end}\nRóżnica średniej: {mean_end - mean_start}\nRóżnica mediany: {median_end - median_start}")
+        return mean_end - mean_start, median_end - median_start
+    except:
+        print("! | ERR: calc_stat_change")
+        return
+        
 if __name__ == '__main__':
     pass
-    # import json
-    # xs = pd.IndexSlice
     
-    # main_gdf, eff_gdf, pow_gdf, woj_gdf = create_main_dataframe()
-    # main_gdf["date"] = main_gdf["date"].astype(str)
-    # list_eff = []
-    # opady_woj, opady_pow, opady_eff = create_dataframes(main_gdf)
-    # # print(type(eff_gdf["ifcid"][0]))
-    # # woj_gdf = woj_gdf[['name', 'geometry']]
-    # # print(woj_gdf)
-    # print(opady_eff.index.values.tolist())
-    # for i in eff_gdf.index:
-    #     eff = eff_gdf["ifcid"][i]
-    #     name = eff_gdf['name1'][i]
-    #     print(eff, name)
-    #     try:
-    #         geom = json.loads(to_geojson(eff_gdf["geometry"][i]))
-    #         mean = opady_eff.loc[xs[eff,:], :].reset_index([0])["mean"].to_dict()
-    #         median = opady_eff.loc[xs[eff,:], :].reset_index([0])["median"].to_dict()
-    #         json_dict = {"ifcid": eff, "name": name, "mean": mean, "median": median, "geometry": geom}
-    #         list_eff.append(json_dict)
-    #     except:
-    #         print("??? Nie ma stacji: ", eff)
-    #         continue
+    # d,m,a,b,c,x = create_main_dataframes()
+    # day, ni, h = create_dataframes(m)
+    # for i in day.index:
+    #     print(day.loc[i]['mean'])
     
-    # create_main_dataframe()
-    # a,b = create_dataframes()
+    # print(m.iloc[50])
+    # e,f = create_geodataframes(d)
+    # calculate_stat_change(e, 'mazowieckie', "2023-10-04 06:00", "2023-10-01 06:00")
     
     # print(a)
     # print()
