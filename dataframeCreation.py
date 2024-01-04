@@ -53,13 +53,13 @@ def create_effacility() -> gpd.GeoDataFrame:
     return eff
 
 def create_wojewodztwa() -> gpd.GeoDataFrame:
-    woj = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\woj.shp").to_crs(epsg=2180)
+    woj = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\woj.shp").to_crs(4326)
     woj = woj[['name', 'geometry']]
     return woj
 
 
 def create_powiaty() -> gpd.GeoDataFrame:
-    powiaty = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\powiaty.shp").to_crs(epsg=2180)
+    powiaty = gpd.read_file(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\powiaty.shp").to_crs(4326)
     powiaty = powiaty[['name', 'geometry']]
     return powiaty
 
@@ -111,7 +111,9 @@ def calculate_stat_change(gdf: gpd.GeoDataFrame, gov_unit_name: str, date_start:
         return
         
 if __name__ == '__main__':
-    pass
+    
+    print(create_wojewodztwa().iloc[0])
+    # pass
     
     # d,m,a,b,c,x = create_main_dataframes()
     # day, ni, h = create_dataframes(m)
