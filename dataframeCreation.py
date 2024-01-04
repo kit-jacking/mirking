@@ -71,6 +71,15 @@ def create_dataframes() -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoData
 
 
 if __name__ == '__main__':
-    stacje_zlaczone = create_main_dataframe()
-    stacje_zlaczone.plot()
-    plt.show()
+    #stacje_zlaczone = create_main_dataframe()
+    powiaty = create_powiaty()
+    print(powiaty.columns)
+    print(powiaty['national_c'])
+
+    '''wojewodztwa = create_wojewodztwa()
+    print(wojewodztwa.to_string())
+    print("--------")
+    print(stacje_zlaczone.to_string())
+    print("--------")'''
+    #stacje_zlaczone.plot()
+    #plt.show()
