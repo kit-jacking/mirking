@@ -19,7 +19,8 @@ def create_json_list_from_gdf(gdf: gpd.GeoDataFrame) -> list[dict]:
         final_list[-1]["geometry"] = element["geometry"]
     return final_list
 
-
+# ***
+# Dodanie surowych?
 def insert_stacje_data(stacje_collection: Collection) -> None:
     stacje = create_main_dataframes()
     stacje["date"] = stacje["date"].astype(str)
@@ -28,7 +29,30 @@ def insert_stacje_data(stacje_collection: Collection) -> None:
     print(lista_do_zapisu)
     stacje_collection.insert_many(lista_do_zapisu)
     
+# ***
+# Dodanie geometrii woj i pow
+def insert_jst_geometries(client: MongoClient, pow_geom_gdf: gpd.GeoDataFrame, woj_geom_gdf: gpd.GeoDataFrame):
+    db_woj_geom = client.geometries.wojewodztwa
+    db_pow_geom = client.geometries.powiaty
     
+    list_woj, list_pow = [], []
+    size = woj_geom_gdf.shape[0]
+    for i in range(size - 1):
+        json_dict = {"name": woj_geom_gdf['name'][i], 'geometry':json.loads(to_geojson(woj_geom_gdf["geometry"][i]))}
+        list_woj.append(json_dict)
+    size = pow_geom_gdf.shape[0]    
+    for i in range(size - 1):
+        json_dict = {"name": pow_geom_gdf['name'][i], 'geometry':json.loads(to_geojson(pow_geom_gdf["geometry"][i]))}
+        list_pow.append(json_dict)
+    
+    print("Inserting woj...")
+    db_woj_geom.insert_many(list_woj)
+    print("Inserting pow...")
+    db_pow_geom.insert_many(list_pow)
+    
+
+# ***
+# Dodanie posortowanych danych do Mongo 
 def insert_sorted_data(client: MongoClient, main_gdf: gpd.GeoDataFrame = None, main_df: pd.DataFrame = None, pow_gdf: gpd.GeoDataFrame = None, woj_gdf: gpd.GeoDataFrame = None) -> None:
     # Inserts data to several databases 
     db_woj = client.grouped_data.wojewodztwa
@@ -145,9 +169,10 @@ if __name__ == '__main__':
     # df = pd.DataFrame.from_dict(obserwacje)
     # print(df)
     # print(df.shape)
-    raw_data_days, raw_data_minutes, stacje_zlaczone, effacility, powiaty, woj = create_main_dataframes()
-    insert_sorted_data(client)
-    
+    # raw_data_days, raw_data_minutes, stacje_zlaczone, effacility, powiaty, woj = create_main_dataframes()
+    # insert_sorted_data(client)
+    pow, woj = create_powiaty(), create_wojewodztwa()
+    insert_jst_geometries(client,pow, woj)  
     # insert_stacje_data(client["test"]["coll"])
     # df = pd.DataFrame(obserwacje)
     # print(df)
