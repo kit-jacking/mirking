@@ -47,8 +47,13 @@ def insert_jst_geometries(client: MongoClient, pow_geom_gdf: gpd.GeoDataFrame, w
     
     print("Inserting woj...")
     db_woj_geom.insert_many(list_woj)
+    print("Indexing...")
+    db_woj_geom.create_index(["geometry", "2dsphere"])
     print("Inserting pow...")
     db_pow_geom.insert_many(list_pow)
+    print("Indexing...")
+    db_pow_geom.create_index(["geometry", "2dsphere"])
+    print("Finished")
     
 
 # ***
@@ -138,7 +143,6 @@ def insert_sorted_data(client: MongoClient, main_gdf: gpd.GeoDataFrame = None, m
         
     db_doba.insert_many(list_doby)
     
-    
 
 def insert_gdf(collection: Collection, gdf: gpd.GeoDataFrame) -> None:
     lista_do_zapisu = create_json_list_from_gdf(gdf)
@@ -151,15 +155,34 @@ def read_collection_data(stacje_collection: Collection) -> gpd.GeoDataFrame:
                                      crs=4326).to_crs(2180)
     return gdf
 
+def read_station_data_within_geometry(client: MongoClient, jst_name: str, woj: bool, pow: bool):
+    if woj: 
+        geom = client.geometries.wojewodztwa.find_one({"name": jst_name},{'geometry':1, '_id':0})
+    else:
+        geom = client.geometries.powiaty.find_one({"name": jst_name},{'geometry':1, '_id':0})
+    
+    # print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": geom}}}))
+    
+
 def connect_to_mongodb(credentials: str) -> MongoClient:
     return MongoClient(credentials)
+
+# !!!
+# ZROBIC GDFY GLOBALNE / WCZYTYWALNE OD RAZU
 
 
 if __name__ == '__main__':
     client: MongoClient = MongoClient("mongodb+srv://haslo:haslo@cluster0.ejzrvjx.mongodb.net/")
     db: Database = client.daneIMGW
     opady: Collection = db.opady
-    obserwacje = dict()
+    # obserwacje = dict() 
+    global pow
+    pow = create_powiaty()
+    pow_geom = pow["geometry"][287]
+    #     print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": json.loads(to_geojson(pow_geom))}}}))
+    # print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": json.loads(to_geojson(pow_geom))}}}, {'geometry':1, '_id':0}))
+    read_station_data_within_geometry(client, 'dolnośląskie', True, False)
+    
     # print(opady.find_one())
     # for wojewodztwo in opady.distinct("properties.name_woj"):
     #     print(f"Liczymy wojewodztwo: {wojewodztwo}")
@@ -171,8 +194,8 @@ if __name__ == '__main__':
     # print(df.shape)
     # raw_data_days, raw_data_minutes, stacje_zlaczone, effacility, powiaty, woj = create_main_dataframes()
     # insert_sorted_data(client)
-    pow, woj = create_powiaty(), create_wojewodztwa()
-    insert_jst_geometries(client,pow, woj)  
+    # pow, woj = create_powiaty(), create_wojewodztwa()
+    # insert_jst_geometries(client,pow, woj)  
     # insert_stacje_data(client["test"]["coll"])
     # df = pd.DataFrame(obserwacje)
     # print(df)
