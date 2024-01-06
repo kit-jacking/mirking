@@ -8,6 +8,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from dataframeCreation import create_dataframes, create_geodataframes, create_main_dataframes, create_powiaty, create_wojewodztwa
 
+MONTH = '10'
+YEAR = '2023'
+DEF_HOUR = '06'
+
 
 def create_json_list_from_gdf(gdf: gpd.GeoDataFrame) -> list[dict]:
     gdf_json = gdf.to_json(to_wgs84=True)
@@ -155,57 +159,68 @@ def read_collection_data(stacje_collection: Collection) -> gpd.GeoDataFrame:
                                      crs=4326).to_crs(2180)
     return gdf
 
-def read_station_data_within_geometry(client: MongoClient, jst_name: str, woj: bool, pow: bool):
-    if woj: 
+# *** FUNKCJA POZWALA NA UZYSKANIE ŚREDNIEJ OPADÓW W SKALI MIESIĄCA DLA DANEJ JEDNOSTKI JST - OBLICZENIA DZIEJĄ SIĘ W BAZIE
+# nie wiem czemu tylko median nie działa - niby jest $median
+def calculate_mean_within_jst(client: MongoClient, jst_name: str, is_woj: bool):
+    if is_woj: 
         geom = client.geometries.wojewodztwa.find_one({"name": jst_name},{'geometry':1, '_id':0})
     else:
         geom = client.geometries.powiaty.find_one({"name": jst_name},{'geometry':1, '_id':0})
-    
-    # print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": geom}}}))
-    
+        
+    print(jst_name)
 
+    result = client.daneIMGW.opady.aggregate([
+        {
+            "$match": {
+                "geometry": {
+                    "$geoWithin": {
+                        "$geometry": geom['geometry']
+                    }
+                }
+            }
+        },
+        {
+            "$group": {
+                "_id": None,
+                "MEAN": {"$avg": "$properties.value"}
+            }
+        }
+    ])
+    # cursor = opady.find_one({"geometry": {"$geoWithin": {"$geometry": geom['geometry']}}})['properties']['value']
+    for r in result:
+        print(r)
+    
+    
+# FUNKCJA ZWRACA LISTĘ WARTOŚCI OPADÓW DLA PRZEDZIAŁU DAT DLA JST
+def read_station_data_within_jst(client: MongoClient, jst_name: str, is_woj: bool, day_start: int = 0, day_end: int = 0):
+    if is_woj: 
+        geom = client.geometries.wojewodztwa.find_one({"name": jst_name},{'geometry':1, '_id':0})
+    else:
+        geom = client.geometries.powiaty.find_one({"name": jst_name},{'geometry':1, '_id':0})
+        
+    if day_start == 0 or day_end == 0: # Zwraca dla całego miesiąca
+        cursor = opady.find({"geometry": {"$geoWithin": {"$geometry": geom['geometry']}}})['properties']['value']
+    else:
+        start_date = f"{YEAR}-{MONTH}-{day_start:02} {DEF_HOUR}:00"
+        end_date = f"{YEAR}-{MONTH}-{day_end:02} {DEF_HOUR}:00"
+        dates = [start_date]
+        for i in range(day_end - day_start - 1):
+            dates.append(f"{YEAR}-{MONTH}-{(i+day_start+1):02} {DEF_HOUR}:00")
+        dates.append(end_date)
+        cursor = client.daneIMGW.opady.find({"$and": [{"geometry": {"$geoWithin": {"$geometry": geom['geometry']}}},{"properties.date": {"$in": dates}}]})
+        
+    for r in cursor:
+        print(r)
+    
 def connect_to_mongodb(credentials: str) -> MongoClient:
     return MongoClient(credentials)
-
-# !!!
-# ZROBIC GDFY GLOBALNE / WCZYTYWALNE OD RAZU
 
 
 if __name__ == '__main__':
     client: MongoClient = MongoClient("mongodb+srv://haslo:haslo@cluster0.ejzrvjx.mongodb.net/")
     db: Database = client.daneIMGW
     opady: Collection = db.opady
-    # obserwacje = dict() 
-    global pow
-    pow = create_powiaty()
-    pow_geom = pow["geometry"][287]
-    #     print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": json.loads(to_geojson(pow_geom))}}}))
-    # print(opady.find_one({"geometry": {"$geoIntersects": {"$geometry": json.loads(to_geojson(pow_geom))}}}, {'geometry':1, '_id':0}))
-    read_station_data_within_geometry(client, 'dolnośląskie', True, False)
-    
-    # print(opady.find_one())
-    # for wojewodztwo in opady.distinct("properties.name_woj"):
-    #     print(f"Liczymy wojewodztwo: {wojewodztwo}")
-    #     obserwacje[wojewodztwo] = [obserwacja["properties.value"] for obserwacja in opady.find({"properties.date": "2023-09-13 06:00:00", "properties.name_woj": wojewodztwo})]
-    #     print("Obserwacje: ", obserwacje[wojewodztwo])
-    # print()
-    # df = pd.DataFrame.from_dict(obserwacje)
-    # print(df)
-    # print(df.shape)
-    # raw_data_days, raw_data_minutes, stacje_zlaczone, effacility, powiaty, woj = create_main_dataframes()
-    # insert_sorted_data(client)
-    # pow, woj = create_powiaty(), create_wojewodztwa()
-    # insert_jst_geometries(client,pow, woj)  
-    # insert_stacje_data(client["test"]["coll"])
-    # df = pd.DataFrame(obserwacje)
-    # print(df)
-    # gdf1 = read_collection_data(wojewodztwa)
-    # gdf2 = read_collection_data(powiaty)
-    # gdf3 = read_collection_data(stacje)
 
-    # gdf1.plot()
-    # gdf2.plot()
-    # gdf3.plot()
-    # plt.show()
+    read_station_data_within_jst(client, 'Rybnik', False,1,5)
 
     client.close()
