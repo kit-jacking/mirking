@@ -1,7 +1,7 @@
 # http://localhost:7474/
 # match (n) detach delete n
 from neo4j import GraphDatabase
-
+import numpy as np
 from dataframeCreation import create_main_dataframe
 
 # 'ifcid', 'type', 'date', 'value', 'geometry', 'index_woj', 'name_woj', 'index_pow', 'name_pow'
@@ -57,15 +57,39 @@ def renew_neo4j_sesion_database(session):
         session.run(query)
 
 def get_mean_value_by_voivodeship(session, voivodeship):
-    return 0
+    query = f'match (p:pow)-[:JEST_W]->(w:woj where w.nazwa="{voivodeship}") return p.nazwa;'
+    powiaty = session.run(query).value()
+    srednie = [get_mean_value_by_powiat(session, powiat) for powiat in powiaty]
+    return np.mean(srednie)
+
+def get_mean_value_by_powiat(session, powiat):
+    query = f'match (s:stacja)-[:JEST_W]->(p:pow where p.nazwa="{powiat}") return s.nazwa;'
+    stacje = session.run(query).value()
+    srednie = [get_mean_value_by_station(session, stacja) for stacja in stacje]
+    return np.mean(srednie)
+
+def get_mean_value_by_station(session, station):
+    query = f'match (p:pomiar)-[:ZROBIONY_W]->(s:stacja where s.nazwa="{station}") return p.wartosc;'
+    pomiary = session.run(query)
+    return np.mean(pomiary.value())
 
 user = "neo4j"
 password = "password"
 driver = GraphDatabase.driver("bolt://localhost:7687", auth=(user, password))
 session = driver.session()
 
-value = get_mean_value_by_voivodeship(session, "warmińsko-mazurskie")
-print(f"Mean value by voivodeship for warmińsko-mazurskie = {value}")
+przykladowe_wojewodztwo = "warmińsko-mazurskie"
+przykladowy_powiat = "legionowski"
+przykladowa_stacja = "250170390"
+
+value = get_mean_value_by_voivodeship(session, przykladowe_wojewodztwo)
+print(f"Mean value wojewodztwo {przykladowe_wojewodztwo}= {value}")
+
+value = get_mean_value_by_powiat(session, przykladowy_powiat)
+print(f"Mean value powiat {przykladowy_powiat} = {value}")
+
+value = get_mean_value_by_station(session, przykladowa_stacja)
+print(f"Mean value stacja {przykladowa_stacja} = {value}")
 
 session.close()
 
