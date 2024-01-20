@@ -10,6 +10,7 @@ from shapely import to_geojson
 def create_main_dataframes() -> gpd.GeoDataFrame:
     powiaty = create_powiaty()
     woj = create_wojewodztwa()
+    
     effacility = create_effacility()
 
     raw_data_days = pd.read_csv(r"C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW\2023-10\B00604S_2023_10.csv",
@@ -37,7 +38,7 @@ def create_main_dataframes() -> gpd.GeoDataFrame:
 
     # Przygotowanie do analizy geostat
     stacje_zlaczone = raw_data_days.merge(effacility[["ifcid", "geometry", "name1"]], how="left", on="ifcid")
-    stacje_zlaczone = gpd.GeoDataFrame(stacje_zlaczone, geometry=stacje_zlaczone["geometry"]).to_crs(epsg=2180)
+    stacje_zlaczone = gpd.GeoDataFrame(stacje_zlaczone, geometry=stacje_zlaczone["geometry"]).to_crs(epsg=4326)
     
     stacje_zlaczone = gpd.tools.sjoin(stacje_zlaczone, woj[["geometry", "name"]], how="left", rsuffix="woj")
     stacje_zlaczone = gpd.tools.sjoin(stacje_zlaczone, powiaty[["geometry", "name"]], how="left", rsuffix="pow").rename(
@@ -80,6 +81,7 @@ def create_dataframes(main_dataframe: pd.DataFrame):
 def create_geodataframes(main_geodataframe: gpd.GeoDataFrame) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame]:
     
     # Srednia i mediana wartości pomiaru w podziale na daty w poszczegolnych wojewodztwach i powiatach:
+    main_geodataframe['date'] = main_geodataframe['date'].astype(str)
     opady_woj = main_geodataframe.groupby(["name_woj", "date"])["value"].aggregate(["mean", "median"])
     opady_pow = main_geodataframe.groupby(["name_pow", "date"])["value"].aggregate(["mean", "median"])
 
