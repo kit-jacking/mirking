@@ -111,7 +111,19 @@ def calculate_stat_change(gdf: gpd.GeoDataFrame, gov_unit_name: str, date_start:
         return
         
 if __name__ == '__main__':
-    pass
+
+    #stacje_zlaczone = create_main_dataframe()
+    powiaty = create_powiaty()
+    print(powiaty.columns)
+    print(powiaty['national_c'])
+
+    '''wojewodztwa = create_wojewodztwa()
+    print(wojewodztwa.to_string())
+    print("--------")
+    print(stacje_zlaczone.to_string())
+    print("--------")'''
+    #stacje_zlaczone.plot()
+    #plt.show()
     
     # d,m,a,b,c,x = create_main_dataframes()
     # day, ni, h = create_dataframes(m)
@@ -129,3 +141,4 @@ if __name__ == '__main__':
     # Wyciaganie danych
     
     # print(a.loc[xs[:,'2023-10-01 06:00:00'], :])
+
