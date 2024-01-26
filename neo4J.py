@@ -2,48 +2,6 @@ import numpy as np
 from neo4j import GraphDatabase
 from dataframeCreation import create_main_dataframe
 
-def add_wojewodztwa(session):
-    gfd = create_wojewodztwa()
-    for i in range(0,16):
-        print(gfd['name'][i])
-        query = 'CREATE (' + str(gfd['name'][i]).replace("-", "_").replace(" ", "_") + ':Wojewodztwo {nazwa:"' + str(gfd['name'][i]) + '"});'
-        session.run(query)
-        query = 'MATCH(a:Kraj) WHERE a.nazwa = "Polska" MATCH(b:Wojewodztwo) WHERE b.nazwa = "' + \
-                str(gfd['name'][i]) + '" CREATE (b)-[:JEST_W]->(a)'
-        session.run(query)
-
-def add_pomiary_stacje_i_powiaty(session):
-    gfd = create_main_dataframe()
-    dane_w_stacji = []
-    prev_ifcid = ''
-    for i in range(0,len(gfd['ifcid'])):
-        if str(gfd['ifcid'][i]) == prev_ifcid or i == 0:
-            dane_w_stacji.append("Pomiar" + str(i) + ': {value:' + str(gfd['value'][i]) + ' , date: "' + str(
-                gfd['date'][i]) + '", value:"' + str(gfd['value'][i]) + '},')
-        elif str(gfd['ifcid'][i]) != prev_ifcid:
-            query = 'CREATE (ID' + prev_ifcid + ' :Stacja {'
-            for i in dane_w_stacji:
-                query += i
-            query += "IFCID: " + str(gfd['ifcid'][i])
-            query += '"});'
-            session.run(query)
-            dane_w_stacji = []
-            dane_w_stacji.append("Pomiar" + str(i) + ': {value:' + str(gfd['value'][i]) + ' , date: "' + str(
-                gfd['date'][i]) + '", value:' + str(gfd['value'][i]) + '},')
-
-        prev_ifcid = str(gfd['ifcid'][i])
-
-def create_database():
-    gfd = create_main_dataframe()
-    for i in range(0, len(gfd['ifcid'])):
-        query = "CREATE(Pomiar:ID" + str(i) + ' {value:' + str(gfd['value'][i]) + ' , date: "' + str(gfd['date'][i]) \
-                + '", value:' + str(gfd['value'][i]) + '})'
-        query += "-[:Przeprowadzony_W {type: '" + str(gfd['type'][i]) + "'} ]->"
-        query += '(ID' + str(gfd['ifcid'][i]) + ':Stacja { nazwa:' + str(gfd['ifcid'][i]) + '})'
-        session.run(query)
-        #Person:Actor {name: 'Charlie Sheen'})-[: ACTED_IN {role: 'Bud Fox'}]->(wallStreet:Movie {title: 'Wall Street'}) < -[: DIRECTED]-(oliver:Person:Director {name: 'Oliver Stone'})"
-
-
 def addPolska():
     query = "CREATE(Polska: Kraj {nazwa: 'Rzeczpospolita Polska', populacja: 38538447})"
     session.run(query)
@@ -177,3 +135,4 @@ if __name__ == "__main__":
 
 
     session.close()
+
