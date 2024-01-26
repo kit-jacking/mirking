@@ -156,7 +156,6 @@ def read_collection_data(stacje_collection: Collection) -> gpd.GeoDataFrame:
     return gdf
 
 # *** FUNKCJA POZWALA NA UZYSKANIE ŚREDNIEJ OPADÓW W SKALI MIESIĄCA DLA DANEJ JEDNOSTKI JST - OBLICZENIA DZIEJĄ SIĘ W BAZIE
-# nie wiem czemu tylko median nie działa - niby jest $median
 def calculate_mean_within_jst(client: MongoClient, jst_name: str, is_woj: bool):
     if is_woj: 
         geom = client.geometries.wojewodztwa.find_one({"name": jst_name},{'geometry':1, '_id':0})
@@ -178,7 +177,6 @@ def calculate_mean_within_jst(client: MongoClient, jst_name: str, is_woj: bool):
         {
             "$group": {
                 "_id": None,
-                # "MEAN": {"$avg": "$value"}
                 "MEAN": {"$avg": "$properties.value"}
             }
         }
@@ -271,7 +269,6 @@ def simple_gui(cred):
     if chosen_menu == "1":
         path = input("Podaj ścieżkę do pobrania danych z IMGW: ")
         download_data(2023, 10, rf'{path}')
-        # C:\Users\qattr\Desktop\STUD\SEM 5\PAG\Projekt-2\Dane\Dane-IMGW
         insert_sorted_data(client)
     elif chosen_menu == '2':
         jst_name, is_woj = jst_input()
@@ -307,16 +304,10 @@ def simple_gui(cred):
     
     
 if __name__ == '__main__':
-    client: MongoClient = MongoClient("mongodb+srv://haslo:haslo@cluster0.ejzrvjx.mongodb.net/")
-    db: Database = client.daneIMGW
-    opady: Collection = db.TTopady
+    # client: MongoClient = MongoClient("mongodb+srv://haslo:haslo@cluster0.ejzrvjx.mongodb.net/")
     
-    # client_cred = input("Podaj link do połączenia do bazy: ")
-    # insert_sorted_data(client)
-    # simple_gui(client_cred)
-    download_sorted_data_jst(client, 0, '4', "złotoryjski")
+    client_cred = input("Podaj link do połączenia do bazy: ")
+    simple_gui(client_cred)
+    # download_sorted_data_jst(client, 0, '4', "złotoryjski")
     # print(read_station_data_within_jst(client, 'Rybnik', False,1,5))
-    
-    # DODANIE OPADOW!!!!
 
-    # client.close()
